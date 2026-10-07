@@ -1,7 +1,6 @@
 import mongoose from 'mongoose'
 import Message from '../../../models/Message.js'
 
-
 const fail = (res, code, message) => res.status(code).json({ status: 'fail', message })
 
 const resolveId = async (id) => {
@@ -10,11 +9,20 @@ const resolveId = async (id) => {
   const position = Number(id)
   if (!Number.isInteger(position) || position < 1) return undefined
 
+  const count = await Message.countDocuments()
+  if (count === 0) return null
+
   const [message] = await Message.find()
     .sort({ _id: 1 })
-    .skip(position - 1)
+    .skip(Math.min(position, count) - 1)
     .limit(1)
   return message ? message._id : null
+}
+
+const readBody = (body = {}) => {
+  const source = body.message && typeof body.message === 'object' ? body.message : body
+  const text = source.text ?? (typeof source.message === 'string' ? source.message : undefined)
+  return { user: source.user, text }
 }
 
 export const list = async (req, res, next) => {
@@ -47,7 +55,7 @@ export const show = async (req, res, next) => {
     if (id === undefined) return fail(res, 400, `Invalid message id: ${req.params.id}`)
 
     const message = id && (await Message.findById(id))
-    if (!message) return fail(res, 404, 'Message not found')
+    if (!message) return fail(res, 404, `Message ${req.params.id} not found`)
 
     res.json({
       status: 'success',
@@ -61,7 +69,7 @@ export const show = async (req, res, next) => {
 
 export const create = async (req, res, next) => {
   try {
-    const { user, text } = req.body?.message ?? {}
+    const { user, text } = readBody(req.body)
     if (!user || !text) return fail(res, 400, 'A message needs a user and a text')
 
     const message = await Message.create({ user, text })
@@ -80,8 +88,10 @@ export const update = async (req, res, next) => {
     const id = await resolveId(req.params.id)
     if (id === undefined) return fail(res, 400, `Invalid message id: ${req.params.id}`)
 
-    const { user, text } = req.body?.message ?? {}
-    if (!user && !text) return fail(res, 400, 'Nothing to update: send a user and/or a text')
+    const { user, text } = readBody(req.body)
+    if (!user && !text) {
+      return fail(res, 400, `Nothing to update, received: ${JSON.stringify(req.body ?? null)}`)
+    }
 
     const changes = {}
     if (user) changes.user = user
@@ -89,7 +99,7 @@ export const update = async (req, res, next) => {
 
     const message =
       id && (await Message.findByIdAndUpdate(id, changes, { new: true, runValidators: true }))
-    if (!message) return fail(res, 404, 'Message not found')
+    if (!message) return fail(res, 404, `Message ${req.params.id} not found`)
 
     res.json({
       status: 'success',
@@ -107,7 +117,7 @@ export const remove = async (req, res, next) => {
     if (id === undefined) return fail(res, 400, `Invalid message id: ${req.params.id}`)
 
     const message = id && (await Message.findByIdAndDelete(id))
-    if (!message) return fail(res, 404, 'Message not found')
+    if (!message) return fail(res, 404, `Message ${req.params.id} not found`)
 
     res.json({
       status: 'success',
