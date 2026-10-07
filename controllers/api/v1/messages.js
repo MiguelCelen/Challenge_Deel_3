@@ -89,10 +89,7 @@ export const update = async (req, res, next) => {
     if (id === undefined) return fail(res, 400, `Invalid message id: ${req.params.id}`)
 
     const { user, text } = readBody(req.body)
-    if (!user && !text) {
-      return fail(res, 400, `Nothing to update, received: ${JSON.stringify(req.body ?? null)}`)
-    }
-
+  
     const changes = {}
     if (user) changes.user = user
     if (text) changes.text = text
