@@ -1,12 +1,22 @@
 import mongoose from 'mongoose'
 import Message from '../../../models/Message.js'
 
-// JSend "fail": de client stuurde iets verkeerd door
+
 const fail = (res, code, message) => res.status(code).json({ status: 'fail', message })
 
-const isValidId = (id) => mongoose.isValidObjectId(id)
+const resolveId = async (id) => {
+  if (mongoose.isValidObjectId(id)) return id
 
-// GET /api/v1/messages  en  GET /api/v1/messages?user=username
+  const position = Number(id)
+  if (!Number.isInteger(position) || position < 1) return undefined
+
+  const [message] = await Message.find()
+    .sort({ _id: 1 })
+    .skip(position - 1)
+    .limit(1)
+  return message ? message._id : null
+}
+
 export const list = async (req, res, next) => {
   try {
     const { user } = req.query
@@ -31,18 +41,17 @@ export const list = async (req, res, next) => {
   }
 }
 
-// GET /api/v1/messages/:id
 export const show = async (req, res, next) => {
   try {
-    const { id } = req.params
-    if (!isValidId(id)) return fail(res, 400, 'Invalid message id')
+    const id = await resolveId(req.params.id)
+    if (id === undefined) return fail(res, 400, `Invalid message id: ${req.params.id}`)
 
-    const message = await Message.findById(id)
+    const message = id && (await Message.findById(id))
     if (!message) return fail(res, 404, 'Message not found')
 
     res.json({
       status: 'success',
-      message: `GETTING message ${id}`,
+      message: `GETTING message ${req.params.id}`,
       data: { message },
     })
   } catch (err) {
@@ -50,8 +59,6 @@ export const show = async (req, res, next) => {
   }
 }
 
-// POST /api/v1/messages
-// Body: { "message": { "user": "Pikachu", "text": "..." } }
 export const create = async (req, res, next) => {
   try {
     const { user, text } = req.body?.message ?? {}
@@ -68,11 +75,10 @@ export const create = async (req, res, next) => {
   }
 }
 
-// PUT /api/v1/messages/:id
 export const update = async (req, res, next) => {
   try {
-    const { id } = req.params
-    if (!isValidId(id)) return fail(res, 400, 'Invalid message id')
+    const id = await resolveId(req.params.id)
+    if (id === undefined) return fail(res, 400, `Invalid message id: ${req.params.id}`)
 
     const { user, text } = req.body?.message ?? {}
     if (!user && !text) return fail(res, 400, 'Nothing to update: send a user and/or a text')
@@ -81,10 +87,8 @@ export const update = async (req, res, next) => {
     if (user) changes.user = user
     if (text) changes.text = text
 
-    const message = await Message.findByIdAndUpdate(id, changes, {
-      new: true,
-      runValidators: true,
-    })
+    const message =
+      id && (await Message.findByIdAndUpdate(id, changes, { new: true, runValidators: true }))
     if (!message) return fail(res, 404, 'Message not found')
 
     res.json({
@@ -97,13 +101,12 @@ export const update = async (req, res, next) => {
   }
 }
 
-// DELETE /api/v1/messages/:id
 export const remove = async (req, res, next) => {
   try {
-    const { id } = req.params
-    if (!isValidId(id)) return fail(res, 400, 'Invalid message id')
+    const id = await resolveId(req.params.id)
+    if (id === undefined) return fail(res, 400, `Invalid message id: ${req.params.id}`)
 
-    const message = await Message.findByIdAndDelete(id)
+    const message = id && (await Message.findByIdAndDelete(id))
     if (!message) return fail(res, 404, 'Message not found')
 
     res.json({
