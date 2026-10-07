@@ -1,0 +1,9 @@
+# Optioneel: lokale MongoDB om te testen (docker compose up -d)
+# Gebruik dan MONGODB_URI=mongodb://localhost:27017/chat in je .env
+services:
+  mongodb:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./data/mongodb:/data/db
