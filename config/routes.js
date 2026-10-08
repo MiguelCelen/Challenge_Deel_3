@@ -3,8 +3,11 @@ import messagesRouter from '../routes/messages.js'
 
 const router = express.Router()
 
+router.get('/api/v1', (req, res) => {
+  res.json({ status: 'success', message: 'API is running', data: null })
+})
+
 router.use('/api/v1/messages', messagesRouter)
-// de opgave vermeldt ook /api/messages/:id (zonder v1)
 router.use('/api/messages', messagesRouter)
 
 export default router
