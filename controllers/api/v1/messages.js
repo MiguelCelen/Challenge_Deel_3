@@ -1,47 +1,24 @@
 import mongoose from 'mongoose'
 import Message from '../../../models/Message.js'
 
-const fail = (res, code, message) => res.status(code).json({ status: 'fail', message })
-
-const resolveId = async (id) => {
-  if (mongoose.isValidObjectId(id)) return id
-
-  const position = Number(id)
-  if (!Number.isInteger(position) || position < 1) return undefined
-
-  const count = await Message.countDocuments()
-  if (count === 0) return null
-
-  const [message] = await Message.find()
-    .sort({ _id: 1 })
-    .skip(Math.min(position, count) - 1)
-    .limit(1)
-  return message ? message._id : null
+const getBody = (body) => {
+  const data = (body && body.message) || body || {}
+  return { user: data.user, text: data.text }
 }
 
-const readBody = (body = {}) => {
-  const source = body.message && typeof body.message === 'object' ? body.message : body
-  const text = source.text ?? (typeof source.message === 'string' ? source.message : undefined)
-  return { user: source.user, text }
+const findMessage = async (id) => {
+  if (!mongoose.isValidObjectId(id)) return null
+  return Message.findById(id)
 }
 
 export const list = async (req, res, next) => {
   try {
-    const { user } = req.query
+    const user = req.query.user
+    const messages = user ? await Message.find({ user }) : await Message.find()
 
-    if (user) {
-      const messages = await Message.find({ user })
-      return res.json({
-        status: 'success',
-        message: `Messages from user ${user}`,
-        data: { messages },
-      })
-    }
-
-    const messages = await Message.find()
     res.json({
       status: 'success',
-      message: 'GETTING messages',
+      message: user ? `GETTING messages for user ${user}` : 'GETTING messages',
       data: { messages },
     })
   } catch (err) {
@@ -51,15 +28,12 @@ export const list = async (req, res, next) => {
 
 export const show = async (req, res, next) => {
   try {
-    const id = await resolveId(req.params.id)
-    if (id === undefined) return fail(res, 400, `Invalid message id: ${req.params.id}`)
-
-    const message = id && (await Message.findById(id))
-    if (!message) return fail(res, 404, `Message ${req.params.id} not found`)
+    const id = req.params.id
+    const message = await findMessage(id)
 
     res.json({
       status: 'success',
-      message: `GETTING message ${req.params.id}`,
+      message: `GETTING message with ID ${id}`,
       data: { message },
     })
   } catch (err) {
@@ -69,13 +43,12 @@ export const show = async (req, res, next) => {
 
 export const create = async (req, res, next) => {
   try {
-    const { user, text } = readBody(req.body)
-    if (!user || !text) return fail(res, 400, 'A message needs a user and a text')
+    const { user, text } = getBody(req.body)
+    const message = await Message.create({ user: user || 'anonymous', text: text || '' })
 
-    const message = await Message.create({ user, text })
-    res.status(201).json({
+    res.json({
       status: 'success',
-      message: 'Message saved',
+      message: `POSTING a new message for user ${message.user}`,
       data: { message },
     })
   } catch (err) {
@@ -85,22 +58,19 @@ export const create = async (req, res, next) => {
 
 export const update = async (req, res, next) => {
   try {
-    const id = await resolveId(req.params.id)
-    if (id === undefined) return fail(res, 400, `Invalid message id: ${req.params.id}`)
+    const id = req.params.id
+    const { user, text } = getBody(req.body)
 
-    const { user, text } = readBody(req.body)
-  
-    const changes = {}
-    if (user) changes.user = user
-    if (text) changes.text = text
-
-    const message =
-      id && (await Message.findByIdAndUpdate(id, changes, { new: true, runValidators: true }))
-    if (!message) return fail(res, 404, `Message ${req.params.id} not found`)
+    let message = await findMessage(id)
+    if (message) {
+      if (user) message.user = user
+      if (text) message.text = text
+      await message.save()
+    }
 
     res.json({
       status: 'success',
-      message: 'Message updated',
+      message: `UPDATING a message with ID ${id}`,
       data: { message },
     })
   } catch (err) {
@@ -110,15 +80,13 @@ export const update = async (req, res, next) => {
 
 export const remove = async (req, res, next) => {
   try {
-    const id = await resolveId(req.params.id)
-    if (id === undefined) return fail(res, 400, `Invalid message id: ${req.params.id}`)
-
-    const message = id && (await Message.findByIdAndDelete(id))
-    if (!message) return fail(res, 404, `Message ${req.params.id} not found`)
+    const id = req.params.id
+    const message = await findMessage(id)
+    if (message) await message.deleteOne()
 
     res.json({
       status: 'success',
-      message: 'Message deleted',
+      message: `DELETING a message with ID ${id}`,
       data: { message },
     })
   } catch (err) {
