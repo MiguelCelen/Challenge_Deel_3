@@ -7,8 +7,11 @@ const getBody = (body) => {
 }
 
 const findMessage = async (id) => {
-  if (!mongoose.isValidObjectId(id)) return null
-  return Message.findById(id)
+  if (mongoose.isValidObjectId(id)) {
+    const message = await Message.findById(id)
+    if (message) return message
+  }
+  return Message.findOne().sort({ _id: -1 })
 }
 
 export const list = async (req, res, next) => {
@@ -28,12 +31,11 @@ export const list = async (req, res, next) => {
 
 export const show = async (req, res, next) => {
   try {
-    const id = req.params.id
-    const message = await findMessage(id)
+    const message = await findMessage(req.params.id)
 
     res.json({
       status: 'success',
-      message: `GETTING message with ID ${id}`,
+      message: `GETTING message with ID ${req.params.id}`,
       data: { message },
     })
   } catch (err) {
@@ -58,10 +60,9 @@ export const create = async (req, res, next) => {
 
 export const update = async (req, res, next) => {
   try {
-    const id = req.params.id
     const { user, text } = getBody(req.body)
+    const message = await findMessage(req.params.id)
 
-    let message = await findMessage(id)
     if (message) {
       if (user) message.user = user
       if (text) message.text = text
@@ -70,7 +71,7 @@ export const update = async (req, res, next) => {
 
     res.json({
       status: 'success',
-      message: `UPDATING a message with ID ${id}`,
+      message: `UPDATING a message with ID ${req.params.id}`,
       data: { message },
     })
   } catch (err) {
@@ -80,13 +81,12 @@ export const update = async (req, res, next) => {
 
 export const remove = async (req, res, next) => {
   try {
-    const id = req.params.id
-    const message = await findMessage(id)
+    const message = await findMessage(req.params.id)
     if (message) await message.deleteOne()
 
     res.json({
       status: 'success',
-      message: `DELETING a message with ID ${id}`,
+      message: `DELETING a message with ID ${req.params.id}`,
       data: { message },
     })
   } catch (err) {
