@@ -1,3 +1,5 @@
+import mongoose from 'mongoose'
+
 const messageSchema = new mongoose.Schema({
   user: { type: String, required: true, trim: true },
   text: { type: String, required: true, trim: true },
@@ -5,3 +7,5 @@ const messageSchema = new mongoose.Schema({
   toJSON: { virtuals: true, versionKey: false },
   toObject: { virtuals: true, versionKey: false },
 })
+
+export default mongoose.model('Message', messageSchema)
