@@ -119,7 +119,7 @@ export const remove = async (req, res, next) => {
     res.json({
       status: 'success',
       message: 'Message deleted',
-      data: { message: { _id: message._id } },
+      data: { message },
     })
   } catch (err) {
     next(err)

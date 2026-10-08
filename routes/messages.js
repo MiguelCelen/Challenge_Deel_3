@@ -3,7 +3,7 @@ import { list, show, create, update, remove } from '../controllers/api/v1/messag
 
 const router = express.Router()
 
-router.get('/', list) // ook ?user=username
+router.get('/', list)
 router.get('/:id', show)
 router.post('/', create)
 router.put('/:id', update)
